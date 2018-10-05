@@ -16,51 +16,22 @@
 
 package com.graphicsfuzz.tool;
 
-import com.graphicsfuzz.common.ast.TranslationUnit;
 import com.graphicsfuzz.common.glslversion.ShadingLanguageVersion;
-import com.graphicsfuzz.common.transformreduce.Constants;
-import com.graphicsfuzz.common.transformreduce.GlslShaderJob;
 import com.graphicsfuzz.common.transformreduce.ShaderJob;
-import com.graphicsfuzz.common.util.FileHelper;
 import com.graphicsfuzz.common.util.Helper;
-import com.graphicsfuzz.common.util.IRandom;
-import com.graphicsfuzz.common.util.IShaderSet;
-import com.graphicsfuzz.common.util.IdGenerator;
+import com.graphicsfuzz.common.util.LocalShaderSet;
 import com.graphicsfuzz.common.util.ParseTimeoutException;
-import com.graphicsfuzz.common.util.RandomWrapper;
-import com.graphicsfuzz.common.util.ReductionProgressHelper;
-import com.graphicsfuzz.common.util.UniformsInfo;
-import com.graphicsfuzz.reducer.IFileJudge;
-import com.graphicsfuzz.reducer.ReductionDriver;
-import com.graphicsfuzz.reducer.ReductionKind;
-import com.graphicsfuzz.reducer.filejudge.FuzzingFileJudge;
-import com.graphicsfuzz.reducer.filejudge.ImageGenErrorShaderFileJudge;
-import com.graphicsfuzz.reducer.filejudge.ImageShaderFileJudge;
-import com.graphicsfuzz.reducer.filejudge.ValidatorErrorShaderFileJudge;
-import com.graphicsfuzz.reducer.reductionopportunities.ReductionOpportunityContext;
-import com.graphicsfuzz.server.thrift.FuzzerServiceManager;
-import com.graphicsfuzz.server.thrift.ImageComparisonMetric;
-import com.graphicsfuzz.shadersets.ExactImageFileComparator;
-import com.graphicsfuzz.shadersets.IShaderDispatcher;
-import com.graphicsfuzz.shadersets.LocalShaderDispatcher;
-import com.graphicsfuzz.shadersets.MetricImageFileComparator;
-import com.graphicsfuzz.shadersets.RemoteShaderDispatcher;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.util.Optional;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Pattern;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import net.sourceforge.argparse4j.ArgumentParsers;
-import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,35 +39,77 @@ public class ConvertShaderFamilies {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ConvertShaderFamilies.class);
 
-  public static void convertShaderFamilyToGL100(
-      IShaderSet shaderFamily,
-      File destDir,
-      String destPrefix,
-      boolean stripHeader) throws IOException, ParseTimeoutException {
+  public static void convertShaderFamiliesToGLVulkan(
+      File shaderFamiliesDir,
+      File outputDir,
+      String prefix,
+      boolean stripHeaders
+  ) throws IOException, ParseTimeoutException {
 
-     shaderFamily.getReference()
+    if (prefix == null) {
+      throw new NullPointerException("prefix is null");
+    }
 
+    File[] shaderFamilies = shaderFamiliesDir.listFiles(File::isDirectory);
+    if (shaderFamilies == null) {
+      throw new IllegalArgumentException("No directories found in " + shaderFamiliesDir);
+    }
+
+    FileUtils.forceMkdir(outputDir);
+
+    for (File shaderFamilyFile : shaderFamilies) {
+
+      LocalShaderSet shaderFamily = new LocalShaderSet(shaderFamilyFile);
+
+      // Collect all shader files.
+      List<File> shaderFiles = new ArrayList<>();
+      shaderFiles.add(shaderFamily.getReference().getAbsoluteFile());
+      for (File f : shaderFamily.getVariants()) {
+        shaderFiles.add(f.getAbsoluteFile());
+      }
+
+      // Convert each file.
+      for (File shaderFile : shaderFiles) {
+        final File sourceDir = shaderFamilyFile;
+        String sourcePrefix = FilenameUtils.removeExtension(shaderFile.getName());
+        File destDir =
+            Paths.get(outputDir.toString(), prefix + shaderFamily.getName()).toFile();
+
+        FileUtils.forceMkdir(destDir);
+
+        ShaderJob sourceJob = Helper.parseShaderJob(sourceDir, sourcePrefix, stripHeaders);
+        sourceJob.makeUniformBindings();
+        Helper.emitShaderJob(
+            sourceJob,
+            ShadingLanguageVersion.ESSL_310,
+            sourcePrefix,
+            destDir,
+            null);
+      }
+    }
   }
 
   private static ArgumentParser getParser() {
 
-    ArgumentParser parser = ArgumentParsers.newArgumentParser("convert_shader")
+    ArgumentParser parser = ArgumentParsers.newArgumentParser("convert_shader_families")
         .defaultHelp(true)
-        .description("Convert a GLSL-Vulkan shader to GLSL 100.");
+        .description("Convert a directory of shader families to GLSL 310 Vulkan.");
 
     // Required arguments
-    parser.addArgument("shader_job")
-        .help("Path of shader job to be converted.  If path is /path/to/p, shaders and meta data "
-            + "to be converted will be /path/to/p.frag, /path/to/p.vert, /path/to/p.json, etc., ")
-        .type(String.class);
+    parser.addArgument("shader_families")
+        .help("Directory to be converted")
+        .type(File.class);
 
-    parser.addArgument("output_shader_job")
-        .help("Path of shader job to be output.  If path is /path/to/p, shaders and meta data "
-            + "output will be /path/to/p.frag, /path/to/p.vert, /path/to/p.json, etc., ")
+    parser.addArgument("output")
+        .help("Output directory")
+        .type(File.class);
+
+    parser.addArgument("prefix")
+        .help("String prefix to add to the name of each output shader family. E.g. Vulkan_")
         .type(String.class);
 
     parser.addArgument("headers")
-        .help("Whether the shader_job shaders have headers. I.e. // END OF GENERATED HEADER")
+        .help("Whether the shaders have headers. I.e. // END OF GENERATED HEADER")
         .type(Boolean.class);
 
     return parser;
@@ -122,32 +135,17 @@ public class ConvertShaderFamilies {
 
     Namespace ns = parser.parseArgs(args);
 
-    File shaderJobPrefix = new File((String) ns.get("shader_job")).getAbsoluteFile();
-    File shaderJobOutputPrefix = new File((String) ns.get("output_shader_job")).getAbsoluteFile();
-    boolean stripHeaders = ns.get("headers");
+    File shaderFamilies = ns.get("shader_families");
+    File outputDir = ns.get("output");
+    String prefix = ns.get("prefix");
+    boolean headers = ns.get("headers");
 
-    if (shaderJobPrefix.isFile() || !shaderJobPrefix.getParentFile().isDirectory()) {
-      throw new ArgumentParserException(
-          "shader_job should be a file prefix, not including the extension",
-          parser);
-    }
-
-    if (shaderJobOutputPrefix.isFile()) {
-      throw new ArgumentParserException(
-          "output_shader_job should be a file prefix, not including the extension",
-          parser);
-    }
-
-    File inputDir = shaderJobPrefix.getParentFile();
-    String inputPrefix = shaderJobPrefix.getName();
-
-    File outputDir = shaderJobOutputPrefix.getParentFile();
-    String outputPrefix = shaderJobOutputPrefix.getName();
-
-    LOGGER.info("Creating output directory " + outputDir);
-    FileUtils.forceMkdir(outputDir);
-
-    convertShaderJobToGL100(inputDir, inputPrefix, outputDir, outputPrefix, stripHeaders);
+    convertShaderFamiliesToGLVulkan(
+        shaderFamilies,
+        outputDir,
+        prefix,
+        headers
+    );
 
   }
 
