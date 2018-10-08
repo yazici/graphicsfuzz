@@ -61,30 +61,37 @@ public class ConvertShaderFamilies {
 
       LocalShaderSet shaderFamily = new LocalShaderSet(shaderFamilyFile);
 
-      // Collect all shader files.
-      List<File> shaderFiles = new ArrayList<>();
-      shaderFiles.add(shaderFamily.getReference().getAbsoluteFile());
-      for (File f : shaderFamily.getVariants()) {
-        shaderFiles.add(f.getAbsoluteFile());
-      }
+      LOGGER.info("Processing family {}.", shaderFamilyFile);
 
-      // Convert each file.
-      for (File shaderFile : shaderFiles) {
-        final File sourceDir = shaderFamilyFile;
-        String sourcePrefix = FilenameUtils.removeExtension(shaderFile.getName());
-        File destDir =
-            Paths.get(outputDir.toString(), prefix + shaderFamily.getName()).toFile();
+      try {
+        // Collect all shader files.
+        List<File> shaderFiles = new ArrayList<>();
+        shaderFiles.add(shaderFamily.getReference().getAbsoluteFile());
+        for (File f : shaderFamily.getVariants()) {
+          shaderFiles.add(f.getAbsoluteFile());
+        }
 
-        FileUtils.forceMkdir(destDir);
+        // Convert each file.
+        for (File shaderFile : shaderFiles) {
+          final File sourceDir = shaderFamilyFile;
+          String sourcePrefix = FilenameUtils.removeExtension(shaderFile.getName());
+          File destDir =
+              Paths.get(outputDir.toString(), prefix + shaderFamily.getName()).toFile();
 
-        ShaderJob sourceJob = Helper.parseShaderJob(sourceDir, sourcePrefix, stripHeaders);
-        sourceJob.makeUniformBindings();
-        Helper.emitShaderJob(
-            sourceJob,
-            ShadingLanguageVersion.ESSL_310,
-            sourcePrefix,
-            destDir,
-            null);
+          FileUtils.forceMkdir(destDir);
+
+          ShaderJob sourceJob = Helper.parseShaderJob(sourceDir, sourcePrefix, stripHeaders);
+          sourceJob.makeUniformBindings();
+          Helper.emitShaderJob(
+              sourceJob,
+              ShadingLanguageVersion.ESSL_310,
+              sourcePrefix,
+              destDir,
+              null);
+        }
+      } catch (Exception exception) {
+        LOGGER.error("", exception);
+        // Fallthrough.
       }
     }
   }
