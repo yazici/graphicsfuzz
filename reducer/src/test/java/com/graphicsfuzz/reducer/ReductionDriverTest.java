@@ -120,9 +120,8 @@ public class ReductionDriverTest {
             null,
             true),
         false,
-        fileOps,
-        state
-    ).doReduction(getPrefix(tempFile), 0, pessimist, testFolder.getRoot(), -1);
+        fileOps)
+        .doReduction(state, getPrefix(tempFile), 0, pessimist, testFolder.getRoot(), -1);
 
   }
 
@@ -228,8 +227,8 @@ public class ReductionDriverTest {
         Optional.empty(), new UniformsInfo(tempJsonFile),
         translationUnits);
 
-    return new ReductionDriver(new ReducerContext(reduceEverywhere, version, generator, new IdGenerator(), true), false, fileOps, state)
-        .doReduction(getPrefix(tempFragmentShaderFile), 0,
+    return new ReductionDriver(new ReducerContext(reduceEverywhere, version, generator, new IdGenerator(), true), false, fileOps)
+        .doReduction(state, getPrefix(tempFragmentShaderFile), 0,
           judge, testFolder.getRoot(), stepLimit);
   }
 
@@ -274,8 +273,8 @@ public class ReductionDriverTest {
         }
       };
 
-    final String reducedFilesPrefix = new ReductionDriver(new ReducerContext(false, version, generator, null, true), false, fileOps, state)
-        .doReduction(getPrefix(tempFile), 0,
+    final String reducedFilesPrefix = new ReductionDriver(new ReducerContext(false, version, generator, null, true), false, fileOps)
+        .doReduction(state, getPrefix(tempFile), 0,
           referencesSinCosAnd3, testFolder.getRoot(), -1);
 
     assertEquals(PrettyPrinterVisitor.prettyPrintAsString(ParseHelper.parse(expected)),
@@ -550,8 +549,8 @@ public class ReductionDriverTest {
         new RandomWrapper(0),
         new IdGenerator(), true),
         false,
-        fileOps, shaderJob)
-        .doReduction("temp", 0,
+        fileOps)
+        .doReduction(shaderJob, "temp", 0,
             (unused, item) -> true, workDir, 100);
 
     CompareAsts.assertEqualAsts(expected, ParseHelper.parse(new File(testFolder.getRoot(), resultsPrefix + ".frag")));

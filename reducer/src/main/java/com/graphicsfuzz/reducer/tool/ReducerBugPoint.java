@@ -142,9 +142,9 @@ public class ReducerBugPoint {
                 10,
                 1, true),
             verbose,
-            fileOps,
-            initialState
+            fileOps
         ).doReduction(
+            initialState,
             FilenameUtils.removeExtension(interestingShaderJobFile.getAbsolutePath()),
             0,
             new RandomFileJudge(
