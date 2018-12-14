@@ -120,8 +120,8 @@ public class ReductionDriverTest {
             null,
             true),
         false,
-        fileOps)
-        .doReduction(state, getPrefix(tempFile), 0, pessimist, testFolder.getRoot(), -1);
+        fileOps, pessimist, testFolder.getRoot())
+        .doReduction(state, getPrefix(tempFile), 0, -1);
 
   }
 
@@ -227,9 +227,10 @@ public class ReductionDriverTest {
         Optional.empty(), new UniformsInfo(tempJsonFile),
         translationUnits);
 
-    return new ReductionDriver(new ReducerContext(reduceEverywhere, version, generator, new IdGenerator(), true), false, fileOps)
-        .doReduction(state, getPrefix(tempFragmentShaderFile), 0,
-          judge, testFolder.getRoot(), stepLimit);
+    return new ReductionDriver(new ReducerContext(reduceEverywhere, version,
+        generator, new IdGenerator(), true), false, fileOps,
+        judge, testFolder.getRoot())
+        .doReduction(state, getPrefix(tempFragmentShaderFile), 0, stepLimit);
   }
 
 
@@ -273,9 +274,11 @@ public class ReductionDriverTest {
         }
       };
 
-    final String reducedFilesPrefix = new ReductionDriver(new ReducerContext(false, version, generator, null, true), false, fileOps)
-        .doReduction(state, getPrefix(tempFile), 0,
-          referencesSinCosAnd3, testFolder.getRoot(), -1);
+    final String reducedFilesPrefix = new ReductionDriver(
+        new ReducerContext(false, version, generator, null,
+            true), false, fileOps,
+        referencesSinCosAnd3, testFolder.getRoot())
+        .doReduction(state, getPrefix(tempFile), 0,-1);
 
     assertEquals(PrettyPrinterVisitor.prettyPrintAsString(ParseHelper.parse(expected)),
           PrettyPrinterVisitor.prettyPrintAsString(ParseHelper.parse(
@@ -549,9 +552,9 @@ public class ReductionDriverTest {
         new RandomWrapper(0),
         new IdGenerator(), true),
         false,
-        fileOps)
-        .doReduction(shaderJob, "temp", 0,
-            (unused, item) -> true, workDir, 100);
+        fileOps,
+        (unused, item) -> true, workDir)
+        .doReduction(shaderJob, "temp", 0, 100);
 
     CompareAsts.assertEqualAsts(expected, ParseHelper.parse(new File(testFolder.getRoot(), resultsPrefix + ".frag")));
 

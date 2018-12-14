@@ -500,13 +500,13 @@ public class GlslReduce {
             idGenerator,
             emitGraphicsFuzzDefines),
         verbose,
-        fileOps)
+        fileOps,
+        fileJudge,
+        workDir)
         .doReduction(
             initialState,
             outputShortName,
             fileCountOffset,
-            fileJudge,
-            workDir,
             stepLimit);
   }
 

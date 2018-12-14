@@ -50,6 +50,10 @@ public class ReductionDriver {
 
   private final ShaderJobFileOperations fileOps;
 
+  private final IFileJudge judge;
+
+  private final File workDir;
+
   private int numSuccessfulReductions = 0;
 
   private final Set<String> failHashes;
@@ -57,9 +61,13 @@ public class ReductionDriver {
 
   public ReductionDriver(ReducerContext context,
                          boolean verbose,
-                         ShaderJobFileOperations fileOps) {
+                         ShaderJobFileOperations fileOps,
+                         IFileJudge judge,
+                         File workDir) {
     this.context = context;
     this.fileOps = fileOps;
+    this.judge = judge;
+    this.workDir = workDir;
     this.plan = new MasterPlan(context, verbose);
     this.failHashes = new HashSet<>();
     this.passHashes = new HashSet<>();
@@ -70,8 +78,6 @@ public class ReductionDriver {
         String shaderJobShortName,
         int fileCountOffset, // Used when continuing a reduction - added on to the number associated
         // with each reduction step during the current reduction.
-        IFileJudge judge,
-        File workDir,
         int stepLimit) throws IOException {
 
     // This is used for Vulkan compatibility.
@@ -88,8 +94,7 @@ public class ReductionDriver {
       } else {
         LOGGER.info("Starting reduction for {}", shaderJobShortName);
         for (int i = 1; ; i++) {
-          if (isInterestingNoCache(judge, initialState, requiresUniformBindings, shaderJobShortName,
-              workDir)) {
+          if (isInterestingNoCache(initialState, requiresUniformBindings, shaderJobShortName)) {
             break;
           }
           LOGGER.info("Result from initial state is not interesting (attempt " + i + ")");
@@ -123,9 +128,8 @@ public class ReductionDriver {
             getReductionStepShaderJobShortName(
                 shaderJobShortName,
                 currentReductionAttempt);
-        if (isInterestingWithCache(judge, newState, requiresUniformBindings,
-            currentShaderJobShortName,
-            workDir)) {
+        if (isInterestingWithCache(newState, requiresUniformBindings,
+            currentShaderJobShortName)) {
           LOGGER.info("Successful reduction.");
           String currentStepShaderJobShortNameWithOutcome =
               getReductionStepShaderJobShortName(
@@ -166,8 +170,7 @@ public class ReductionDriver {
 
       String finalOutputFilePrefix = shaderJobShortName + "_reduced_final";
 
-      if (!isInterestingNoCache(judge, finalState, requiresUniformBindings, finalOutputFilePrefix,
-          workDir)) {
+      if (!isInterestingNoCache(finalState, requiresUniformBindings, finalOutputFilePrefix)) {
         LOGGER.info(
             "Failed to simplify final reduction state! Reverting to the non-simplified state.");
         writeState(currentState, new File(workDir, finalOutputFilePrefix + ".json"),
@@ -185,11 +188,9 @@ public class ReductionDriver {
     }
   }
 
-  private boolean isInteresting(IFileJudge judge,
-                                ShaderJob state,
+  private boolean isInteresting(ShaderJob state,
                                 boolean requiresUniformBindings,
                                 String shaderJobShortName,
-                                File workDir,
                                 boolean useCache) throws IOException, FileJudgeException {
     final File shaderJobFile = new File(workDir, shaderJobShortName + ".json");
     final File resultFile = new File(workDir, shaderJobShortName + ".info.json");
@@ -220,21 +221,17 @@ public class ReductionDriver {
     return false;
   }
 
-  private boolean isInterestingWithCache(IFileJudge judge,
-                                ShaderJob state,
+  private boolean isInterestingWithCache(ShaderJob state,
                                 boolean requiresUniformBindings,
-                                String shaderJobShortName,
-                                File workDir) throws IOException, FileJudgeException {
+                                String shaderJobShortName) throws IOException, FileJudgeException {
 
-    return isInteresting(judge, state, requiresUniformBindings, shaderJobShortName, workDir, true);
+    return isInteresting(state, requiresUniformBindings, shaderJobShortName, true);
   }
 
-  private boolean isInterestingNoCache(IFileJudge judge,
-                                ShaderJob state,
+  private boolean isInterestingNoCache(ShaderJob state,
                                 boolean requiresUniformBindings,
-                                String shaderJobShortName,
-                                File workDir) throws IOException, FileJudgeException {
-    return isInteresting(judge, state, requiresUniformBindings, shaderJobShortName, workDir, false);
+                                String shaderJobShortName) throws IOException, FileJudgeException {
+    return isInteresting(state, requiresUniformBindings, shaderJobShortName, false);
   }
 
   private void writeState(ShaderJob state, File shaderJobFileOutput,
