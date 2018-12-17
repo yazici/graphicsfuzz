@@ -56,8 +56,10 @@ public class ReductionDriver {
 
   private int numSuccessfulReductions = 0;
 
-  private final Set<String> failHashes;
-  private final Set<String> passHashes;
+  private final Set<String> failHashCache;
+  private final Set<String> passHashCache;
+
+  private int failHashCacheHits;
 
   public ReductionDriver(ReducerContext context,
                          boolean verbose,
@@ -69,8 +71,9 @@ public class ReductionDriver {
     this.judge = judge;
     this.workDir = workDir;
     this.plan = new MasterPlan(context, verbose);
-    this.failHashes = new HashSet<>();
-    this.passHashes = new HashSet<>();
+    this.failHashCache = new HashSet<>();
+    this.passHashCache = new HashSet<>();
+    this.failHashCacheHits = 0;
   }
 
   public String doReduction(
@@ -182,6 +185,7 @@ public class ReductionDriver {
         fileOps.createFile(new File(workDir, Constants.REDUCTION_INCOMPLETE));
       }
 
+      LOGGER.info("Total fail hash cache hits: " + failHashCacheHits);
       return finalOutputFilePrefix;
     } catch (FileNotFoundException | FileJudgeException exception) {
       throw new RuntimeException(exception);
@@ -199,10 +203,13 @@ public class ReductionDriver {
     String hash = null;
     if (useCache) {
       hash = fileOps.getShaderJobFileHash(shaderJobFile);
-      if (failHashes.contains(hash)) {
+      if (failHashCache.contains(hash)) {
+        LOGGER.info(
+            "Fail hash cache hit.");
+        failHashCacheHits++;
         return false;
       }
-      if (passHashes.contains(hash)) {
+      if (passHashCache.contains(hash)) {
         throw new RuntimeException("Reduction loop detected!");
       }
     }
@@ -211,12 +218,12 @@ public class ReductionDriver {
         shaderJobFile,
         resultFile)) {
       if (useCache) {
-        passHashes.add(hash);
+        passHashCache.add(hash);
       }
       return true;
     }
     if (useCache) {
-      failHashes.add(hash);
+      failHashCache.add(hash);
     }
     return false;
   }
