@@ -24,12 +24,13 @@ import com.graphicsfuzz.reducer.reductionopportunities.IReductionOpportunityFind
 import com.graphicsfuzz.reducer.reductionopportunities.ReducerContext;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SimplePass implements IReductionPass {
+public class RandomizedReductionPass implements IReductionPass {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SimplePass.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RandomizedReductionPass.class);
 
   private final ReducerContext reducerContext;
   private final boolean verbose;
@@ -39,7 +40,7 @@ public class SimplePass implements IReductionPass {
   private int replenishCount;
   private final List<Integer> history;
 
-  public SimplePass(
+  public RandomizedReductionPass(
       ReducerContext reducerContext,
       boolean verbose,
       IReductionOpportunityFinder<?> opportunitiesFinder) {
@@ -62,19 +63,18 @@ public class SimplePass implements IReductionPass {
   }
 
   @Override
-  public ShaderJob applyReduction(ShaderJob shaderJob)
-      throws NoMoreToReduceException {
+  public Optional<ShaderJob> applyReduction(ShaderJob shaderJob) {
     final ShaderJob workingShaderJob = shaderJob.clone();
     int localPercentageToReduce = percentageToReduce;
     while (true) {
       if (attemptToTransform(workingShaderJob, localPercentageToReduce)) {
-        return workingShaderJob;
+        return Optional.of(workingShaderJob);
       }
       localPercentageToReduce /= 2;
       if (localPercentageToReduce > 0) {
         history.clear();
       } else {
-        throw new NoMoreToReduceException();
+        return Optional.empty();
       }
     }
   }

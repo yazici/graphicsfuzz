@@ -17,13 +17,13 @@
 package com.graphicsfuzz.reducer.glslreducers;
 
 import com.graphicsfuzz.common.transformreduce.ShaderJob;
+import java.util.Optional;
 
 public interface IReductionPass {
 
-  void update(boolean interesting);
+  Optional<ShaderJob> applyReduction(ShaderJob shaderJob);
 
-  ShaderJob applyReduction(ShaderJob shaderJob)
-      throws NoMoreToReduceException;
+  void update(boolean interesting);
 
   void replenish();
 
