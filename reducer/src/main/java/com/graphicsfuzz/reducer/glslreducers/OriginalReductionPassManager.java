@@ -44,7 +44,7 @@ public class OriginalReductionPassManager implements IReductionPassManager {
       if (currentPassSteps < MAX_STEPS_PER_PASS) {
         // Try the current pass.
         final Optional<ShaderJob> maybeResult =
-            getCurrentPass().applyReduction(state);
+            getCurrentPass().tryApplyReduction(state);
         if (maybeResult.isPresent()) {
           currentPassSteps++;
           return maybeResult;
@@ -77,7 +77,7 @@ public class OriginalReductionPassManager implements IReductionPassManager {
     if (isInteresting) {
       somePassMadeProgress = true;
     }
-    getCurrentPass().update(isInteresting);
+    getCurrentPass().notifyInteresting(isInteresting);
   }
 
   private IReductionPass getCurrentPass() {

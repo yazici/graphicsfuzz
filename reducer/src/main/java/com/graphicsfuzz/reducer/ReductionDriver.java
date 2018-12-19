@@ -23,6 +23,8 @@ import com.graphicsfuzz.reducer.glslreducers.IReductionPass;
 import com.graphicsfuzz.reducer.glslreducers.IReductionPassManager;
 import com.graphicsfuzz.reducer.glslreducers.OriginalReductionPassManager;
 import com.graphicsfuzz.reducer.glslreducers.RandomizedReductionPass;
+import com.graphicsfuzz.reducer.glslreducers.SystematicReductionPass;
+import com.graphicsfuzz.reducer.glslreducers.SystematicReductionPassManager;
 import com.graphicsfuzz.reducer.reductionopportunities.IReductionOpportunityFinder;
 import com.graphicsfuzz.reducer.reductionopportunities.ReducerContext;
 import com.graphicsfuzz.reducer.util.Simplify;
@@ -77,11 +79,9 @@ public class ReductionDriver {
     this.passHashCache = new HashSet<>();
     this.failHashCacheHits = 0;
 
-
     final List<IReductionPass> passes = new ArrayList<>();
     for (IReductionOpportunityFinder ops : new IReductionOpportunityFinder[]{
         IReductionOpportunityFinder.vectorizationFinder(),
-        IReductionOpportunityFinder.mutationFinder(),
         IReductionOpportunityFinder.unswitchifyFinder(),
         IReductionOpportunityFinder.stmtFinder(),
         IReductionOpportunityFinder.functionFinder(),
@@ -89,6 +89,7 @@ public class ReductionDriver {
         IReductionOpportunityFinder.functionFinder(),
         IReductionOpportunityFinder.compoundExprToSubExprFinder(),
         IReductionOpportunityFinder.functionFinder(),
+        IReductionOpportunityFinder.mutationFinder(),
         IReductionOpportunityFinder.loopMergeFinder(),
         IReductionOpportunityFinder.compoundToBlockFinder(),
         IReductionOpportunityFinder.inlineInitializerFinder(),
@@ -106,11 +107,11 @@ public class ReductionDriver {
         IReductionOpportunityFinder.foldConstantFinder(),
         IReductionOpportunityFinder.inlineUniformFinder(),
     }) {
-      passes.add(new RandomizedReductionPass(context,
+      passes.add(new SystematicReductionPass(context,
           verbose,
           ops));
     }
-    this.passManager = new OriginalReductionPassManager(passes);
+    this.passManager = new SystematicReductionPassManager(passes);
 
   }
 

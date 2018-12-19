@@ -21,10 +21,14 @@ import java.util.Optional;
 
 public interface IReductionPass {
 
-  Optional<ShaderJob> applyReduction(ShaderJob shaderJob);
+  Optional<ShaderJob> tryApplyReduction(ShaderJob shaderJob);
 
-  void update(boolean interesting);
+  void notifyInteresting(boolean interesting);
+
+  String getName();
 
   void replenish();
+
+  boolean reachedMinimumGranularity();
 
 }

@@ -28,13 +28,11 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class RandomizedReductionPass implements IReductionPass {
+public class RandomizedReductionPass extends AbstractReductionPass {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RandomizedReductionPass.class);
 
-  private final ReducerContext reducerContext;
   private final boolean verbose;
-  private final IReductionOpportunityFinder<?> opportunitiesFinder;
 
   private int percentageToReduce;
   private int replenishCount;
@@ -43,27 +41,26 @@ public class RandomizedReductionPass implements IReductionPass {
   public RandomizedReductionPass(
       ReducerContext reducerContext,
       boolean verbose,
-      IReductionOpportunityFinder<?> opportunitiesFinder) {
-    this.reducerContext = reducerContext;
+      IReductionOpportunityFinder<?> finder) {
+    super(reducerContext, finder);
     this.verbose = verbose;
-    this.opportunitiesFinder = opportunitiesFinder;
     this.percentageToReduce = reducerContext.getMaxPercentageToReduce();
     this.replenishCount = 0;
     this.history = new ArrayList<>();
   }
 
   @Override
-  public void update(boolean interesting) {
+  public void notifyInteresting(boolean interesting) {
     if (interesting) {
       history.clear();
     } else {
       percentageToReduce = Math.max(0,
-            percentageToReduce - reducerContext.getAggressionDecreaseStep());
+            percentageToReduce - getReducerContext().getAggressionDecreaseStep());
     }
   }
 
   @Override
-  public Optional<ShaderJob> applyReduction(ShaderJob shaderJob) {
+  public Optional<ShaderJob> tryApplyReduction(ShaderJob shaderJob) {
     final ShaderJob workingShaderJob = shaderJob.clone();
     int localPercentageToReduce = percentageToReduce;
     while (true) {
@@ -80,7 +77,7 @@ public class RandomizedReductionPass implements IReductionPass {
   }
 
   private boolean attemptToTransform(ShaderJob shaderJob, int localPercentageToReduce) {
-    LOGGER.info("Looking for opportunities of kind: " + opportunitiesFinder.getName());
+    LOGGER.info("Looking for opportunities of kind: " + getName());
     if (verbose) {
       LOGGER.info("Applying " + localPercentageToReduce + "% reduction");
     }
@@ -139,14 +136,14 @@ public class RandomizedReductionPass implements IReductionPass {
     for (; taken < maxOpportunitiesToTake; taken++) {
 
       final List<? extends IReductionOpportunity> currentReductionOpportunities =
-            opportunitiesFinder.findOpportunities(
-                  shaderJob, reducerContext);
+            getFinder().findOpportunities(
+                  shaderJob, getReducerContext());
       if (currentReductionOpportunities.isEmpty()) {
         break;
       }
 
       final IReductionOpportunity nextReductionOpportunity = currentReductionOpportunities
-            .get(reducerContext.getRandom()
+            .get(getReducerContext().getRandom()
                   .nextInt(currentReductionOpportunities.size()));
 
       if (ReductionDriver.DEBUG_REDUCER) {
@@ -166,7 +163,7 @@ public class RandomizedReductionPass implements IReductionPass {
         ShaderJob shaderJob) {
     // Get the available reduction opportunities.
     final List<? extends IReductionOpportunity> initialReductionOpportunities =
-          opportunitiesFinder.findOpportunities(shaderJob, reducerContext);
+        getFinder().findOpportunities(shaderJob, getReducerContext());
 
     initialReductionOpportunities.sort((first, second) -> first.depth().compareTo(second.depth()));
     return initialReductionOpportunities;
@@ -183,7 +180,7 @@ public class RandomizedReductionPass implements IReductionPass {
   private int skewedRandomElement(List<Integer> options) {
     final int maximum = options.size();
     final int index =
-          (maximum - 1) - (int) Math.sqrt(Math.pow((double) reducerContext
+          (maximum - 1) - (int) Math.sqrt(Math.pow((double) getReducerContext()
                 .getRandom().nextInt(maximum), 2.0));
     assert index >= 0;
     assert index < maximum;
@@ -205,11 +202,17 @@ public class RandomizedReductionPass implements IReductionPass {
   @Override
   public void replenish() {
     replenishCount++;
-    percentageToReduce = reducerContext.getMaxPercentageToReduce();
+    percentageToReduce = getReducerContext().getMaxPercentageToReduce();
     for (int i = 0; i < replenishCount; i++) {
       percentageToReduce /= 2;
     }
     percentageToReduce = Math.max(percentageToReduce, 1);
+  }
+
+  @Override
+  public boolean reachedMinimumGranularity() {
+    throw new UnsupportedOperationException("reachedMinimumGranularity not supported by this kind "
+        + "of reduction pass.");
   }
 
 }
