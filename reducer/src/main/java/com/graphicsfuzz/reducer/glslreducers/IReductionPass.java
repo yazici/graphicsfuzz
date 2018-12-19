@@ -18,7 +18,7 @@ package com.graphicsfuzz.reducer.glslreducers;
 
 import com.graphicsfuzz.common.transformreduce.ShaderJob;
 
-public interface IReductionPlan {
+public interface IReductionPass {
 
   void update(boolean interesting);
 

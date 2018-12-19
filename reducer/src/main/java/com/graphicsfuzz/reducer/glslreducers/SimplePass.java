@@ -27,9 +27,9 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SimplePlan implements IReductionPlan {
+public class SimplePass implements IReductionPass {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SimplePlan.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SimplePass.class);
 
   private final ReducerContext reducerContext;
   private final boolean verbose;
@@ -39,7 +39,7 @@ public class SimplePlan implements IReductionPlan {
   private int replenishCount;
   private final List<Integer> history;
 
-  public SimplePlan(
+  public SimplePass(
       ReducerContext reducerContext,
       boolean verbose,
       IReductionOpportunityFinder<?> opportunitiesFinder) {

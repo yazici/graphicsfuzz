@@ -19,9 +19,9 @@ package com.graphicsfuzz.reducer;
 import com.graphicsfuzz.common.transformreduce.GlslShaderJob;
 import com.graphicsfuzz.common.transformreduce.ShaderJob;
 import com.graphicsfuzz.common.util.ShaderJobFileOperations;
-import com.graphicsfuzz.reducer.glslreducers.IReductionPlan;
+import com.graphicsfuzz.reducer.glslreducers.IReductionPass;
 import com.graphicsfuzz.reducer.glslreducers.NoMoreToReduceException;
-import com.graphicsfuzz.reducer.glslreducers.SimplePlan;
+import com.graphicsfuzz.reducer.glslreducers.SimplePass;
 import com.graphicsfuzz.reducer.reductionopportunities.FailedReductionException;
 import com.graphicsfuzz.reducer.reductionopportunities.IReductionOpportunityFinder;
 import com.graphicsfuzz.reducer.reductionopportunities.ReducerContext;
@@ -63,8 +63,7 @@ public class ReductionDriver {
   private int failHashCacheHits;
 
 
-  // TODO: this is the first stage in a refactoring; the terminology "plan" will go away soon.
-  private List<IReductionPlan> reductionPlans;
+  private List<IReductionPass> reductionPasses;
   // TODO: these fields were moved from the now deleted MasterPlan class.  Moving them here to
   // get functional equivalence as the first stage of a refactoring.
   private static final int MAX_STEPS_PER_PASS = 200;
@@ -86,7 +85,7 @@ public class ReductionDriver {
     this.passHashCache = new HashSet<>();
     this.failHashCacheHits = 0;
 
-    this.reductionPlans = new ArrayList<>();
+    this.reductionPasses = new ArrayList<>();
     for (IReductionOpportunityFinder ops : new IReductionOpportunityFinder[]{
         IReductionOpportunityFinder.vectorizationFinder(),
         IReductionOpportunityFinder.mutationFinder(),
@@ -114,7 +113,7 @@ public class ReductionDriver {
         IReductionOpportunityFinder.foldConstantFinder(),
         IReductionOpportunityFinder.inlineUniformFinder(),
     }) {
-      reductionPlans.add(new SimplePlan(context,
+      reductionPasses.add(new SimplePass(context,
           verbose,
           ops));
     }
@@ -195,7 +194,7 @@ public class ReductionDriver {
           numSuccessfulReductions++;
           currentState = newState;
           somePassMadeProgress = true;
-          getCurrentPlan().update(true);
+          getCurrentPass().update(true);
         } else {
           LOGGER.info("Failed reduction.");
           String currentStepShaderJobShortNameWithOutcome =
@@ -208,7 +207,7 @@ public class ReductionDriver {
               new File(workDir, currentStepShaderJobShortNameWithOutcome + ".json"),
               true
           );
-          getCurrentPlan().update(false);
+          getCurrentPass().update(false);
         }
 
         if (stepLimit > -1 && stepCount >= stepLimit) {
@@ -241,8 +240,8 @@ public class ReductionDriver {
     }
   }
 
-  public IReductionPlan getCurrentPlan() {
-    return reductionPlans.get(passIndex);
+  public IReductionPass getCurrentPass() {
+    return reductionPasses.get(passIndex);
   }
 
   private boolean isInteresting(ShaderJob state,
@@ -335,22 +334,22 @@ public class ReductionDriver {
       try {
         while (true) {
           if (currentPassSteps < MAX_STEPS_PER_PASS) {
-            // Try the current plan.
+            // Try the current pass.
             try {
-              final ShaderJob result = getCurrentPlan().applyReduction(state);
+              final ShaderJob result = getCurrentPass().applyReduction(state);
               currentPassSteps++;
               return result;
             } catch (NoMoreToReduceException exception) {
-              // The current slave plan failed.  Replenish it, in case it is needed again later, and
-              // move on to the next plan.
-              getCurrentPlan().replenish();
+              // The current pass failed.  Replenish it, in case it is needed again later, and
+              // move on to the next pass.
+              getCurrentPass().replenish();
             }
           }
 
           passIndex++;
           currentPassSteps = 0;
 
-          if (passIndex == reductionPlans.size()) {
+          if (passIndex == reductionPasses.size()) {
             // We've done all the passes.
             if (!somePassMadeProgress) {
               // No pass made progress; we have reached a fixed-point for this shader kind.
@@ -360,7 +359,8 @@ public class ReductionDriver {
               somePassMadeProgress = false;
             }
           }
-          // Having updated the slave plan, try to transform again.
+          // Having moved on to the next reduction pass, try to transform
+          // again.
         }
       } catch (FailedReductionException exception) {
         attempts++;
