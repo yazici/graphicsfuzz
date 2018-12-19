@@ -20,16 +20,19 @@ import com.graphicsfuzz.common.transformreduce.GlslShaderJob;
 import com.graphicsfuzz.common.transformreduce.ShaderJob;
 import com.graphicsfuzz.common.util.ShaderJobFileOperations;
 import com.graphicsfuzz.reducer.glslreducers.IReductionPlan;
-import com.graphicsfuzz.reducer.glslreducers.MasterPlan;
 import com.graphicsfuzz.reducer.glslreducers.NoMoreToReduceException;
+import com.graphicsfuzz.reducer.glslreducers.SimplePlan;
 import com.graphicsfuzz.reducer.reductionopportunities.FailedReductionException;
+import com.graphicsfuzz.reducer.reductionopportunities.IReductionOpportunityFinder;
 import com.graphicsfuzz.reducer.reductionopportunities.ReducerContext;
 import com.graphicsfuzz.reducer.util.Simplify;
 import com.graphicsfuzz.util.Constants;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -46,8 +49,6 @@ public class ReductionDriver {
 
   private final ReducerContext context;
 
-  private final IReductionPlan plan;
-
   private final ShaderJobFileOperations fileOps;
 
   private final IFileJudge judge;
@@ -61,6 +62,17 @@ public class ReductionDriver {
 
   private int failHashCacheHits;
 
+
+  // TODO: this is the first stage in a refactoring; the terminology "plan" will go away soon.
+  private List<IReductionPlan> reductionPlans;
+  // TODO: these fields were moved from the now deleted MasterPlan class.  Moving them here to
+  // get functional equivalence as the first stage of a refactoring.
+  private static final int MAX_STEPS_PER_PASS = 200;
+  private int passIndex;
+  private int currentPassSteps;
+  private boolean somePassMadeProgress;
+
+
   public ReductionDriver(ReducerContext context,
                          boolean verbose,
                          ShaderJobFileOperations fileOps,
@@ -70,10 +82,46 @@ public class ReductionDriver {
     this.fileOps = fileOps;
     this.judge = judge;
     this.workDir = workDir;
-    this.plan = new MasterPlan(context, verbose);
     this.failHashCache = new HashSet<>();
     this.passHashCache = new HashSet<>();
     this.failHashCacheHits = 0;
+
+    this.reductionPlans = new ArrayList<>();
+    for (IReductionOpportunityFinder ops : new IReductionOpportunityFinder[]{
+        IReductionOpportunityFinder.vectorizationFinder(),
+        IReductionOpportunityFinder.mutationFinder(),
+        IReductionOpportunityFinder.unswitchifyFinder(),
+        IReductionOpportunityFinder.stmtFinder(),
+        IReductionOpportunityFinder.functionFinder(),
+        IReductionOpportunityFinder.exprToConstantFinder(),
+        IReductionOpportunityFinder.functionFinder(),
+        IReductionOpportunityFinder.compoundExprToSubExprFinder(),
+        IReductionOpportunityFinder.functionFinder(),
+        IReductionOpportunityFinder.loopMergeFinder(),
+        IReductionOpportunityFinder.compoundToBlockFinder(),
+        IReductionOpportunityFinder.inlineInitializerFinder(),
+        IReductionOpportunityFinder.outlinedStatementFinder(),
+        IReductionOpportunityFinder.unwrapFinder(),
+        IReductionOpportunityFinder.removeStructFieldFinder(),
+        IReductionOpportunityFinder.destructifyFinder(),
+        IReductionOpportunityFinder.inlineStructFieldFinder(),
+        IReductionOpportunityFinder.liveFragColorWriteFinder(),
+        IReductionOpportunityFinder.inlineFunctionFinder(),
+        IReductionOpportunityFinder.functionFinder(),
+        IReductionOpportunityFinder.variableDeclFinder(),
+        IReductionOpportunityFinder.globalVariablesDeclarationFinder(),
+        IReductionOpportunityFinder.unusedParamFinder(),
+        IReductionOpportunityFinder.foldConstantFinder(),
+        IReductionOpportunityFinder.inlineUniformFinder(),
+    }) {
+      reductionPlans.add(new SimplePlan(context,
+          verbose,
+          ops));
+    }
+    this.passIndex = 0;
+    this.currentPassSteps = 0;
+    this.somePassMadeProgress = false;
+
   }
 
   public String doReduction(
@@ -146,7 +194,8 @@ public class ReductionDriver {
           );
           numSuccessfulReductions++;
           currentState = newState;
-          plan.update(true);
+          somePassMadeProgress = true;
+          getCurrentPlan().update(true);
         } else {
           LOGGER.info("Failed reduction.");
           String currentStepShaderJobShortNameWithOutcome =
@@ -159,7 +208,7 @@ public class ReductionDriver {
               new File(workDir, currentStepShaderJobShortNameWithOutcome + ".json"),
               true
           );
-          plan.update(false);
+          getCurrentPlan().update(false);
         }
 
         if (stepLimit > -1 && stepCount >= stepLimit) {
@@ -190,6 +239,10 @@ public class ReductionDriver {
     } catch (FileNotFoundException | FileJudgeException exception) {
       throw new RuntimeException(exception);
     }
+  }
+
+  public IReductionPlan getCurrentPlan() {
+    return reductionPlans.get(passIndex);
   }
 
   private boolean isInteresting(ShaderJob state,
@@ -274,11 +327,41 @@ public class ReductionDriver {
   }
 
   private ShaderJob applyReduction(ShaderJob state) throws NoMoreToReduceException {
+    // TODO: this is way too complex and needs to be simplified.  It has become like this due to
+    //  the first stage in a refactoring, and will be simplified soon.
     int attempts = 0;
     final int maxAttempts = 3;
     while (true) {
       try {
-        return plan.applyReduction(state);
+        while (true) {
+          if (currentPassSteps < MAX_STEPS_PER_PASS) {
+            // Try the current plan.
+            try {
+              final ShaderJob result = getCurrentPlan().applyReduction(state);
+              currentPassSteps++;
+              return result;
+            } catch (NoMoreToReduceException exception) {
+              // The current slave plan failed.  Replenish it, in case it is needed again later, and
+              // move on to the next plan.
+              getCurrentPlan().replenish();
+            }
+          }
+
+          passIndex++;
+          currentPassSteps = 0;
+
+          if (passIndex == reductionPlans.size()) {
+            // We've done all the passes.
+            if (!somePassMadeProgress) {
+              // No pass made progress; we have reached a fixed-point for this shader kind.
+              throw new NoMoreToReduceException();
+            } else {
+              passIndex = 0;
+              somePassMadeProgress = false;
+            }
+          }
+          // Having updated the slave plan, try to transform again.
+        }
       } catch (FailedReductionException exception) {
         attempts++;
         if (attempts == maxAttempts) {

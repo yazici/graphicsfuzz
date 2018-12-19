@@ -39,10 +39,10 @@ public class SimplePlan implements IReductionPlan {
   private int replenishCount;
   private final List<Integer> history;
 
-  SimplePlan(
-        ReducerContext reducerContext,
-        boolean verbose,
-        IReductionOpportunityFinder<?> opportunitiesFinder) {
+  public SimplePlan(
+      ReducerContext reducerContext,
+      boolean verbose,
+      IReductionOpportunityFinder<?> opportunitiesFinder) {
     this.reducerContext = reducerContext;
     this.verbose = verbose;
     this.opportunitiesFinder = opportunitiesFinder;
