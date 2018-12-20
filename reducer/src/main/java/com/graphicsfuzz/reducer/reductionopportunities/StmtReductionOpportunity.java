@@ -19,17 +19,24 @@ package com.graphicsfuzz.reducer.reductionopportunities;
 import com.graphicsfuzz.common.ast.stmt.BlockStmt;
 import com.graphicsfuzz.common.ast.stmt.Stmt;
 import com.graphicsfuzz.common.ast.visitors.VisitationDepth;
+import com.graphicsfuzz.common.util.StatsVisitor;
 
 public final class StmtReductionOpportunity extends AbstractReductionOpportunity {
 
-  private BlockStmt blockStmt;
-  private Stmt child;
+  private final BlockStmt blockStmt;
+  private final Stmt child;
+
+  // This tracks the number of nodes that will be removed by applying the opportunity at its
+  // time of creation (this number may be different when the opportunity is actually applied,
+  // due to the effects of other opportunities).
+  private final int numRemovableNodes;
 
   public StmtReductionOpportunity(BlockStmt blockStmt, Stmt child,
       VisitationDepth depth) {
     super(depth);
     this.blockStmt = blockStmt;
     this.child = child;
+    this.numRemovableNodes = new StatsVisitor(child).getNumNodes();
   }
 
   public Stmt getChild() {
@@ -55,4 +62,9 @@ public final class StmtReductionOpportunity extends AbstractReductionOpportunity
     }
     return true;
   }
+
+  public int getNumRemovableNodes() {
+    return numRemovableNodes;
+  }
+
 }
