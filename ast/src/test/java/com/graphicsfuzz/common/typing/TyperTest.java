@@ -19,6 +19,7 @@ package com.graphicsfuzz.common.typing;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import com.graphicsfuzz.common.ast.IAstNode;
@@ -26,6 +27,7 @@ import com.graphicsfuzz.common.ast.TranslationUnit;
 import com.graphicsfuzz.common.ast.decl.FunctionPrototype;
 import com.graphicsfuzz.common.ast.decl.ParameterDecl;
 import com.graphicsfuzz.common.ast.expr.ArrayIndexExpr;
+import com.graphicsfuzz.common.ast.expr.BinOp;
 import com.graphicsfuzz.common.ast.expr.BinaryExpr;
 import com.graphicsfuzz.common.ast.expr.BoolConstantExpr;
 import com.graphicsfuzz.common.ast.expr.FloatConstantExpr;
@@ -315,6 +317,23 @@ public class TyperTest {
           default:
             assertTrue(false);
         }
+      }
+    }.visit(tu);
+  }
+
+  @Test
+  public void testCommaTyped() throws Exception {
+    TranslationUnit tu = ParseHelper.parse("void main() {"
+        + "int x;"
+        + "int y;"
+        + "x, y; }");
+    Typer typer = new NullCheckTyper(tu, ShadingLanguageVersion.GLSL_440);
+    new StandardVisitor() {
+      @Override
+      public void visitBinaryExpr(BinaryExpr binaryExpr) {
+        super.visitBinaryExpr(binaryExpr);
+        assertSame(binaryExpr.getOp(), BinOp.COMMA);
+        assertEquals(BasicType.INT, typer.lookupType(binaryExpr));
       }
     }.visit(tu);
   }
