@@ -34,9 +34,6 @@ public class SystematicReductionPassManager implements IReductionPassManager {
   // The core passes to be iterated over frequently.
   private final List<IReductionPass> corePasses;
 
-  // Passes to be used at the end of a reduction so that a minimum is reached.
-  private final List<IReductionPass> exhaustivePasses;
-
   // Starts by referring to core, then switches to cleanup.
   private List<IReductionPass> currentPasses;
 
@@ -47,18 +44,18 @@ public class SystematicReductionPassManager implements IReductionPassManager {
   // The index of the pass currently being applied.
   private int passIndex;
 
+  private int numTimeInitialPassesIterated;
+
   public SystematicReductionPassManager(List<IReductionPass> initialPasses,
-                                        List<IReductionPass> corePasses,
-                                        List<IReductionPass> exhaustivePasses) {
+                                        List<IReductionPass> corePasses) {
     this.initialPasses = new ArrayList<>();
     this.initialPasses.addAll(initialPasses);
     this.corePasses = new ArrayList<>();
     this.corePasses.addAll(corePasses);
-    this.exhaustivePasses = new ArrayList<>();
-    this.exhaustivePasses.addAll(exhaustivePasses);
     this.anotherRoundWorthwhile = false;
     this.currentPasses = this.initialPasses;
     this.passIndex = 0;
+    this.numTimeInitialPassesIterated = 0;
   }
 
   @Override
@@ -76,12 +73,15 @@ public class SystematicReductionPassManager implements IReductionPassManager {
       passIndex++;
       if (passIndex < currentPasses.size()) {
         anotherRoundWorthwhile |= !getCurrentPass().reachedMinimumGranularity();
+      } else if (currentPasses == initialPasses) {
+        numTimeInitialPassesIterated++;
+        if (numTimeInitialPassesIterated < 3) {
+          startNewRound(currentPasses);
+        } else {
+          startNewRound(corePasses);
+        }
       } else if (anotherRoundWorthwhile) {
         startNewRound(currentPasses);
-      } else if (currentPasses == initialPasses) {
-        startNewRound(corePasses);
-      } else if (currentPasses == corePasses) {
-        startNewRound(exhaustivePasses);
       } else {
         return Optional.empty();
       }

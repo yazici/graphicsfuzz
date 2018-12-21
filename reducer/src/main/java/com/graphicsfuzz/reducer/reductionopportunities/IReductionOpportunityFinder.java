@@ -17,6 +17,8 @@
 package com.graphicsfuzz.reducer.reductionopportunities;
 
 import com.graphicsfuzz.common.transformreduce.ShaderJob;
+import com.graphicsfuzz.common.util.IRandom;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -375,16 +377,18 @@ public interface IReductionOpportunityFinder<T extends IReductionOpportunity> {
   }
 
   static IReductionOpportunityFinder<StmtReductionOpportunity>
-      largestStmtsFinder(int maxOpportunities) {
+      largestStmtsFinder(int opportunitiesToConsider, int opportunitiesToTake) {
     return new IReductionOpportunityFinder<StmtReductionOpportunity>() {
       @Override
       public List<StmtReductionOpportunity> findOpportunities(
           ShaderJob shaderJob,
           ReducerContext context) {
-        List<StmtReductionOpportunity> ops = stmtFinder().findOpportunities(shaderJob, context);
+        List<StmtReductionOpportunity> ops = stmtFinder().findOpportunities(shaderJob,
+            context);
         ops.sort(Comparator.comparingInt(
             StmtReductionOpportunity::getNumRemovableNodes).reversed());
-        return ops.subList(0, Math.min(ops.size(), maxOpportunities));
+        return sample(ops, context.getRandom(),
+            opportunitiesToConsider, opportunitiesToTake);
       }
 
       @Override
@@ -395,7 +399,7 @@ public interface IReductionOpportunityFinder<T extends IReductionOpportunity> {
   }
 
   static IReductionOpportunityFinder<FunctionReductionOpportunity>
-      largestFunctionsFinder(int maxOpportunities) {
+      largestFunctionsFinder(int opportunitiesToConsider, int opportunitiesToTake) {
     return new IReductionOpportunityFinder<FunctionReductionOpportunity>() {
       @Override
       public List<FunctionReductionOpportunity> findOpportunities(
@@ -405,7 +409,8 @@ public interface IReductionOpportunityFinder<T extends IReductionOpportunity> {
             context);
         ops.sort(Comparator.comparingInt(
             FunctionReductionOpportunity::getNumRemovableNodes).reversed());
-        return ops.subList(0, Math.min(ops.size(), maxOpportunities));
+        return sample(ops, context.getRandom(),
+            opportunitiesToConsider, opportunitiesToTake);
       }
 
       @Override
@@ -416,7 +421,7 @@ public interface IReductionOpportunityFinder<T extends IReductionOpportunity> {
   }
 
   static IReductionOpportunityFinder<SimplifyExprReductionOpportunity>
-      largestExprToConstantFinder(int maxOpportunities) {
+      largestExprToConstantFinder(int opportunitiesToConsider, int opportunitiesToTake) {
     return new IReductionOpportunityFinder<SimplifyExprReductionOpportunity>() {
       @Override
       public List<SimplifyExprReductionOpportunity> findOpportunities(
@@ -427,7 +432,8 @@ public interface IReductionOpportunityFinder<T extends IReductionOpportunity> {
             context);
         ops.sort(Comparator.comparingInt(
             SimplifyExprReductionOpportunity::getNumRemovableNodes).reversed());
-        return ops.subList(0, Math.min(ops.size(), maxOpportunities));
+        return sample(ops, context.getRandom(),
+            opportunitiesToConsider, opportunitiesToTake);
       }
 
       @Override
@@ -438,7 +444,7 @@ public interface IReductionOpportunityFinder<T extends IReductionOpportunity> {
   }
 
   static IReductionOpportunityFinder<SimplifyExprReductionOpportunity>
-      largestCompoundExprToSubExpr(int maxOpportunities) {
+      largestCompoundExprToSubExpr(int opportunitiesToConsider, int opportunitiesToTake) {
     return new IReductionOpportunityFinder<SimplifyExprReductionOpportunity>() {
       @Override
       public List<SimplifyExprReductionOpportunity> findOpportunities(
@@ -449,7 +455,8 @@ public interface IReductionOpportunityFinder<T extends IReductionOpportunity> {
             context);
         ops.sort(Comparator.comparingInt(
             SimplifyExprReductionOpportunity::getNumRemovableNodes).reversed());
-        return ops.subList(0, Math.min(ops.size(), maxOpportunities));
+        return sample(ops, context.getRandom(),
+            opportunitiesToConsider, opportunitiesToTake);
       }
 
       @Override
@@ -457,6 +464,40 @@ public interface IReductionOpportunityFinder<T extends IReductionOpportunity> {
         return "largestCompoundExprToSubExpr";
       }
     };
+  }
+
+  static IReductionOpportunityFinder<MutationReductionOpportunity>
+      largestMutationFinder(int opportunitiesToConsider, int opportunitiesToTake) {
+    return new IReductionOpportunityFinder<MutationReductionOpportunity>() {
+      @Override
+      public List<MutationReductionOpportunity> findOpportunities(
+          ShaderJob shaderJob,
+          ReducerContext context) {
+        List<MutationReductionOpportunity> ops =
+            mutationFinder().findOpportunities(shaderJob,
+                context);
+        ops.sort(Comparator.comparingInt(
+            MutationReductionOpportunity::getNumRemovableNodes).reversed());
+        return sample(ops, context.getRandom(),
+            opportunitiesToConsider, opportunitiesToTake);
+      }
+
+      @Override
+      public String getName() {
+        return "largestMutation";
+      }
+    };
+  }
+
+  static <T> List<T> sample(List<T> opportunities, IRandom random, int opportunitiesToConsider,
+                            int opportunitiesToTake) {
+    List<T> temp = new ArrayList<>();
+    temp.addAll(opportunities.subList(0, Math.min(opportunities.size(), opportunitiesToConsider)));
+    List<T> result = new ArrayList<>();
+    for (int count = 0; count < opportunitiesToTake && !temp.isEmpty(); count++) {
+      result.add(temp.remove(random.nextInt(temp.size())));
+    }
+    return result;
   }
 
 }

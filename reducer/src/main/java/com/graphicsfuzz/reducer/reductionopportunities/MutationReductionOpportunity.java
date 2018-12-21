@@ -19,12 +19,14 @@ package com.graphicsfuzz.reducer.reductionopportunities;
 import com.graphicsfuzz.common.ast.expr.Expr;
 import com.graphicsfuzz.common.ast.expr.FunctionCallExpr;
 import com.graphicsfuzz.common.ast.visitors.VisitationDepth;
+import com.graphicsfuzz.common.util.StatsVisitor;
 
 public final class MutationReductionOpportunity extends AbstractReductionOpportunity {
 
   private Expr parent;
   private Expr childToReduce;
   private OpaqueFunctionType function;
+  private int numRemovableNodes;
 
   MutationReductionOpportunity(Expr parent, Expr childToReduce, OpaqueFunctionType function,
       VisitationDepth depth) {
@@ -32,6 +34,9 @@ public final class MutationReductionOpportunity extends AbstractReductionOpportu
     this.parent = parent;
     this.childToReduce = childToReduce;
     this.function = function;
+    this.numRemovableNodes =
+        new StatsVisitor(childToReduce).getNumNodes()
+            - new StatsVisitor(extractExpr(childToReduce)).getNumNodes();
   }
 
   private Expr extractExpr(Expr exprToReduce) {
@@ -78,6 +83,10 @@ public final class MutationReductionOpportunity extends AbstractReductionOpportu
       return false;
     }
     return true;
+  }
+
+  public int getNumRemovableNodes() {
+    return numRemovableNodes;
   }
 
 }
