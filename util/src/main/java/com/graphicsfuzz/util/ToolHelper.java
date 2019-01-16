@@ -99,7 +99,7 @@ public class ToolHelper {
     return new ExecHelper().exec(
           redirectType,
           null,
-          false,
+          true,
           command.toArray(new String[]{}));
   }
 

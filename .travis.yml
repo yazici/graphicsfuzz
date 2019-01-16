@@ -53,7 +53,15 @@ matrix:
         - TITLE="GraphicsFuzz tools"
       script:
         - export PYTHON_GF="python3.5"
-        - jdk_switcher use openjdk8 && build/travis/travis-release-graphicsfuzz.sh
+        - |
+          jdk_switcher use openjdk8 && \
+          SOURCE="$(pwd)" && \
+          pushd "${HOME}" && \
+          source "${SOURCE}/build/travis/install-maven.sh" && \
+          popd && \
+          build/travis/build-graphicsfuzz-fast.sh && \
+          PROG="assembly-binaries/target/assembly-binaries-1.0/swiftshader/get_image_egl" && \
+
 
     - os: linux
       dist: trusty
