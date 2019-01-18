@@ -85,6 +85,13 @@ public class ToolHelper {
       int height)
         throws IOException, InterruptedException {
     List<String> command = new ArrayList<>(Arrays.asList(
+          "gdb",
+          "-batch",
+          "-ex",
+          "run",
+          "-ex",
+          "bt",
+          "--args",
           ToolPaths.getImageEglSwiftshader(),
           fragmentShader.toString(),
           "--output", imageOutput.toString(),

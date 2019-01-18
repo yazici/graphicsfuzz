@@ -59,24 +59,23 @@ matrix:
           pushd "${HOME}" && \
           source "${SOURCE}/build/travis/install-maven.sh" && \
           popd && \
-          build/travis/build-graphicsfuzz-fast.sh && \
-          PROG="assembly-binaries/target/assembly-binaries-1.0/swiftshader/get_image_egl" && \
+          mvn test '-Dtest=GeneratorUnitTest' -pl tester -am -DfailIfNoTests=false -P imageTests
 
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          sources:
-            - deadsnakes
-          packages:
-            - python3.5
-      env:
-        - TITLE="GLES and Vulkan workers"
-      script:
-        - export PYTHON_GF="python3.5"
-        - jdk_switcher use openjdk8 && build/travis/travis-release-android-related.sh
+#    - os: linux
+#      dist: trusty
+#      sudo: required
+#      addons:
+#        apt:
+#          sources:
+#            - deadsnakes
+#          packages:
+#            - python3.5
+#      env:
+#        - TITLE="GLES and Vulkan workers"
+#      script:
+#        - export PYTHON_GF="python3.5"
+#        - jdk_switcher use openjdk8 && build/travis/travis-release-android-related.sh
 
 
 # Docker build. Not currently needed but can be useful as it is faster than installing many
