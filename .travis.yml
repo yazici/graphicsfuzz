@@ -49,6 +49,7 @@ matrix:
             - deadsnakes
           packages:
             - python3.5
+            - gdb
       env:
         - TITLE="GraphicsFuzz tools"
       script:
@@ -59,6 +60,7 @@ matrix:
           pushd "${HOME}" && \
           source "${SOURCE}/build/travis/install-maven.sh" && \
           popd && \
+          mvn package -pl assembly-binaries -am && \
           mvn test '-Dtest=GeneratorUnitTest' -pl tester -am -DfailIfNoTests=false -P imageTests
 
 
