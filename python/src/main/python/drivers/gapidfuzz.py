@@ -39,15 +39,15 @@ class Params(object):
         self.shaders_dir = 'shaders'
         self.donors = 'donors'
         self.families_dir = 'families'
-        self.num_variants = 10
+        self.num_variants = 2
         self.seed = 0
         # Only replace a specific shader handle in the trace.
         self.specific_handle = None  # type: str
         # Only use a specific variant index.
         self.specific_variant_index = None  # type: int
         self.gapis_process = None  # type: subprocess.Popen
-        self.get_screenshots = False
-        self.just_frag = False
+        self.get_screenshots = True
+        self.just_frag = True
 
     def __str__(self):
         return pprint.pformat(self.__dict__)
@@ -185,7 +185,7 @@ def process_shaders(params: Params):
     for f in Path(params.shaders_dir).iterdir():  # type: Path
         if not is_shader_extension(f.name):
             continue
-        if f.name.endswith(".frag") and params.just_frag:
+        if params.just_frag and not f.name.endswith(".frag"):
             continue
         json_file = f.with_name(f.stem + ".json")
         with io.open(str(json_file), "w", encoding='utf-8') as json:
@@ -199,6 +199,7 @@ def fuzz_shaders(params: Params):
     # for reference: glsl-generate --seed 0 references donors 10 prefix out --no-injection-switch
     res = glsl_generate.go([
         "--seed", nz(str(params.seed)),
+        "--disable-shader-translator",
         nz(params.shaders_dir),
         nz(params.donors),
         nz(str(params.num_variants)),
@@ -220,11 +221,11 @@ def create_traces(params: Params):
             shader_handle = remove_start(family.name, "family_")
             if params.specific_handle is not None and params.specific_handle != shader_handle:
                 continue
-            variant_shaders = list(family.glob("variant_*.frag"))
+            variant_shaders = sorted(list(family.glob("variant_*.frag")))
             if len(variant_shaders) == 0:
-                variant_shaders = list(family.glob("variant_*.vert"))
+                variant_shaders = sorted(list(family.glob("variant_*.vert")))
             if len(variant_shaders) == 0:
-                variant_shaders = list(family.glob("variant_*.comp"))
+                variant_shaders = sorted(list(family.glob("variant_*.comp")))
             assert(len(variant_shaders) > 0)
             # to string
             variant_shaders = [str(v) for v in variant_shaders]
@@ -277,7 +278,7 @@ def run_replace_shader(params: Params, capture_id: str, shader_handle: str, shad
 def fuzz_trace(p: Params):
     # Shadowing p here so that you can copy and paste these into an ipython 3 shell.
 
-    run_gapis_async(p)
+    #run_gapis_async(p)
 
     # We should find a better way to load the capture;
     # getting a screenshot is unnecessarily heavy.
