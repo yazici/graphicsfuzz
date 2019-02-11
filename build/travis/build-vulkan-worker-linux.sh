@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2018 The GraphicsFuzz Project Authors
+# Copyright 2019 The GraphicsFuzz Project Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,9 +21,17 @@ set -u
 test -d temp
 test -d build/travis
 
-time build/travis/build-graphicsfuzz-fast.sh
-time build/travis/build-graphicsfuzz-medium.sh
-time build/travis/build-gles-worker-desktop.sh
-time build/travis/build-gles-worker-android.sh
-time build/travis/build-vulkan-worker-android.sh
-time build/travis/build-vulkan-worker-linux.sh
+mkdir -p out/
+
+mkdir -p vulkan-worker/build
+
+pushd vulkan-worker/build
+rm -rf ./*
+cmake ../ -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
+cmake --build . --config Debug -- -j$(nproc)
+popd
+
+cp vulkan-worker/build/vkworker out/vkworker
+
+# Check headers.
+build/travis/python-launch build/travis/check_headers.py
