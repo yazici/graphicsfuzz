@@ -30,3 +30,6 @@ relative_path=`find . -name x86_64`
 absolute_path=`readlink -f $relative_path`
 
 export VULKAN_SDK="$absolute_path"
+export PATH="$VULKAN_SDK/bin:$PATH"
+export LD_LIBRARY_PATH="$VULKAN_SDK/lib:$LD_LIBRARY_PATH"
+export VK_LAYER_PATH="$VULKAN_SDK/etc/explicit_layer.d"
