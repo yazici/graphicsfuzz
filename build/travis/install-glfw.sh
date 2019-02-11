@@ -26,7 +26,7 @@ echo "Get glfw3"
 version="3.2.1"
 
 wget --no-verbose https://github.com/glfw/glfw/releases/download/${version}/glfw-${version}.zip
-unzip glfw-${version}.zip
+unzip -q glfw-${version}.zip
 
 echo "Compile glfw3"
 
@@ -36,5 +36,5 @@ pushd build
 
 cmake ../glfw-${version} -G "Unix Makefiles" -DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF -DGLFW_BUILD_DOCS=OFF -DGLFW_VULKAN_STATIC=OFF
 cmake --build .
-cmake -P cmake_install.cmake
+sudo cmake -P cmake_install.cmake
 popd
