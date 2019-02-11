@@ -23,8 +23,8 @@ test "$GITHUB_RELEASE_TOOL_PLATFORM" = "linux_amd64"
 
 echo "Installing Vulkan SDK"
 
-wget https://sdk.lunarg.com/sdk/download/latest/linux/vulkan-sdk.tar.gz
-tar xzvf vulkan-sdk.tar.gz
+curl -sSo "vulkan-sdk.tar.gz" "https://sdk.lunarg.com/sdk/download/latest/linux/vulkan-sdk.tar.gz"
+tar xzvf "vulkan-sdk.tar.gz"
 
 relative_path=`find . -name x86_64`
 absolute_path=`readlink -f $relative_path`

@@ -73,6 +73,8 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
+      before_install:
+        sudo apt-get install -y libglfw3 libglfw3-dev
       addons:
         apt:
           sources:
