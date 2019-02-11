@@ -40,6 +40,24 @@ env:
 
 matrix:
   include:
+
+    - os: linux
+      dist: trusty
+      sudo: required
+      before_install:
+        sudo apt-get install -y xorg-dev
+      addons:
+        apt:
+          sources:
+            - deadsnakes
+          packages:
+            - python3.5
+      env:
+        - TITLE="Linux Vulkan worker"
+      script:
+        - export PYTHON_GF="python3.5"
+        - jdk_switcher use openjdk8 && build/travis/travis-release-vulkan-worker.sh
+
     - os: linux
       dist: trusty
       sudo: required
@@ -70,22 +88,6 @@ matrix:
         - export PYTHON_GF="python3.5"
         - jdk_switcher use openjdk8 && build/travis/travis-release-android-related.sh
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      before_install:
-        sudo apt-get install -y libglfw3 libglfw3-dev
-      addons:
-        apt:
-          sources:
-            - deadsnakes
-          packages:
-            - python3.5
-      env:
-        - TITLE="Linux Vulkan worker"
-      script:
-        - export PYTHON_GF="python3.5"
-        - jdk_switcher use openjdk8 && build/travis/travis-release-vulkan-worker.sh
 
 # Docker build. Not currently needed but can be useful as it is faster than installing many
 # packages.

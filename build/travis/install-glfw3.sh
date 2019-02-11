@@ -18,23 +18,23 @@ set -x
 set -e
 set -u
 
-source build/travis/travis-env.sh
+# This script is for Linux only
+test "$GITHUB_RELEASE_TOOL_PLATFORM" = "linux_amd64"
 
-SOURCE="$(pwd)"
+echo "Get glfw3"
 
-pushd "${HOME}"
+version="3.2.1"
 
-  mkdir -p vulkan-sdk
-  pushd vulkan-sdk
-  time source "${SOURCE}/build/travis/install-vulkan-sdk.sh"
-  popd
+wget --no-verbose https://github.com/glfw/glfw/releases/download/${version}/glfw-${version}.zip
+unzip glfw-${version}.zip
 
-  mkdir -p glfw
-  pushd glfw
-  time source "${SOURCE}/build/travis/install-glfw.sh"
-  popd
+echo "Compile glfw3"
 
+mkdir -p build
+
+pushd build
+
+cmake ../glfw-${version} -G "Unix Makefiles" -DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF -DGLFW_BUILD_DOCS=OFF -DGLFW_VULKAN_STATIC=OFF
+cmake --build .
+cmake -P cmake_install.cmake
 popd
-
-time build/travis/build-vulkan-worker-linux.sh
-time build/travis/release-out.sh
