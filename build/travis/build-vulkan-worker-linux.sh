@@ -27,7 +27,7 @@ mkdir -p vulkan-worker/build
 
 pushd vulkan-worker/build
 rm -rf ./*
-cmake ../ -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MODULE_PATH="${HOME}/local/glfw/lib/cmake/glfw3/"
+cmake ../ -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="${HOME}/local/glfw"
 cmake --build . --config Debug -- -j$(nproc)
 popd
 
