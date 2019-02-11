@@ -25,6 +25,10 @@ mkdir -p out/
 
 mkdir -p vulkan-worker/build
 
+echo "======== hugues env"
+env
+echo "======== hugues env end"
+
 pushd vulkan-worker/build
 rm -rf ./*
 export CXXFLAGS="-Wno-missing-field-initializers"
