@@ -27,7 +27,7 @@ mkdir -p vulkan-worker/build
 
 pushd vulkan-worker/build
 rm -rf ./*
-cmake ../ -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="${HOME}/local/glfw"
+cmake ../ -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="${HOME}/local/glfw" -E env CXXFLAGS="-Wno-missing-field-initializers"
 cmake --build . --config Debug -- -j$(nproc)
 popd
 
