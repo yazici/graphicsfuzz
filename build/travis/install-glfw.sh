@@ -28,13 +28,18 @@ version="3.2.1"
 wget --no-verbose https://github.com/glfw/glfw/releases/download/${version}/glfw-${version}.zip
 unzip -q glfw-${version}.zip
 
-echo "Compile glfw3"
-
 mkdir -p build
 
 pushd build
 
+echo "Compile glfw3"
 cmake ../glfw-${version} -G "Unix Makefiles" -DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF -DGLFW_BUILD_DOCS=OFF -DGLFW_VULKAN_STATIC=OFF
-cmake --build .
-sudo cmake -P cmake_install.cmake
+cmake --build . -- -j$(nproc)
+
+echo "Install glfw3"
+# This install path is expected when building the linux vulkan worker
+install="${HOME}/local/glfw"
+mkdir -p ${install}
+cmake -DCMAKE_INSTALL_PREFIX="${install}" -P cmake_install.cmake
+
 popd
