@@ -33,7 +33,7 @@ pushd vulkan-worker/build
 rm -rf ./*
 export CXXFLAGS="-Wno-missing-field-initializers"
 cmake ../ -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="${HOME}/local/glfw"
-cmake --build . --config Debug -- -j$(nproc)
+cmake --build . --config Debug -- -j$(nproc) VERBOSE=1
 popd
 
 cp vulkan-worker/build/vkworker out/vkworker
