@@ -650,7 +650,7 @@ def get_ssbo_binding(comp_json):
     binding = j['$compute']['buffer']['binding']
     return binding
 
-def run_compute(comp, comp_json):
+def run_compute_android(comp, comp_json):
     assert(os.path.isfile(comp))
     assert(os.path.isfile(comp_json))
 
@@ -702,6 +702,38 @@ def run_compute(comp, comp_json):
     with open('STATUS', 'w') as f:
         f.write(status)
 
+def run_compute_linux(comp, comp_json):
+    assert(os.path.isfile(comp))
+    assert(os.path.isfile(comp_json))
+
+    script = vkscriptify_comp(comp, comp_json)
+
+    tmpfile = 'tmpscript.shader_test'
+
+    with open(tmpfile, 'w') as f:
+        f.write(script)
+
+    # call vkrunner
+    ssbo_binding = get_ssbo_binding(comp_json)
+    cmd = 'vkrunner -b ssbo -B ' + str(ssbo_binding) + ' ' + tmpfile + ' > ' + LOGFILE
+
+    status = 'SUCCESS'
+    try:
+        subprocess.run(cmd, shell=True, timeout=TIMEOUT_RUN).check_returncode()
+    except subprocess.TimeoutExpired:
+        status = 'TIMEOUT'
+    except subprocess.CalledProcessError:
+        status = 'CRASH'
+
+    if status == 'SUCCESS':
+        assert(os.path.isfile('ssbo'))
+        ssbo_bin_to_json('ssbo', 'ssbo.json')
+
+    with open(LOGFILE, 'a') as f:
+        f.write('\nSTATUS ' + status + '\n')
+
+    with open('STATUS', 'w') as f:
+        f.write(status)
 
 ################################################################################
 # Main
@@ -717,7 +749,9 @@ def main():
     group.add_argument('-i', '--serial', help='Android device serial number. Implies --android')
     group.add_argument('-l', '--linux', action='store_true', help='Render on Linux')
     group.add_argument('--vkrunner', action='store_true', help='Render using vkrunner')
-    group.add_argument('--compute', help='Run compute shader using vkrunner. Temp: Values for vert and frag arguments must be provided, but will be ignored.')
+
+    parser.add_argument('--compute',
+                       help='Run compute shader using vkrunner. Temp: Values for vert and frag arguments must be provided, but will be ignored, so empty strings are fine for these arguments.')
 
     parser.add_argument('-s', '--skip-render', action='store_true', help='Skip render')
 
@@ -731,25 +765,31 @@ def main():
     args = parser.parse_args()
 
     if not args.android and not args.serial and not args.linux and not args.vkrunner and not args.compute:
-        print('You must set either --android, --serial, --linux, --vkrunner or --compute option.')
+        print('You must set either --android, --serial, --linux or --vkrunner option.')
         exit(1)
 
+    # Set Android serial
+    if args.serial:
+        os.environ['ANDROID_SERIAL'] = args.serial
+        args.android = True
+
+    # Compute shader special treatment
     if args.compute:
         comp = prepare_shader(args.compute)
-        run_compute(comp, args.json)
+        if args.android:
+            run_compute_android(comp, args.json)
+        elif args.linux:
+            run_compute_linux(comp, args.json)
+        else:
+            print('Either --android or --linux must be set when using --compute')
+            exit(1)
         return
 
     vert = prepare_shader(args.vert)
     frag = prepare_shader(args.frag)
-
     wait_for_screen = not args.force
 
     # These are mutually exclusive, but we return after each for clarity:
-
-    if args.serial:
-        os.environ['ANDROID_SERIAL'] = args.serial
-        run_android(vert, frag, args.json, args.skip_render, wait_for_screen)
-        return
 
     if args.android:
         run_android(vert, frag, args.json, args.skip_render, wait_for_screen)

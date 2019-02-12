@@ -288,7 +288,10 @@ def do_compute_job(args, comp_job):
             res.status = tt.JobStatus.UNEXPECTED_ERROR
             return res
 
-    vkrun.run_compute(tmpcompspv, tmpjson)
+    if args.linux:
+        vkrun.run_compute_linux(tmpcompspv, tmpjson)
+    else:
+        vkrun.run_compute_android(tmpcompspv, tmpjson)
 
     if os.path.isfile(vkrun.LOGFILE):
         with open(vkrun.LOGFILE, 'r', encoding='utf-8', errors='ignore') as f:
