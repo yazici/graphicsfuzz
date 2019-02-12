@@ -32,7 +32,7 @@ echo "======== hugues env end"
 pushd vulkan-worker/build
 rm -rf ./*
 export CXXFLAGS="-Wno-missing-field-initializers"
-cmake ../ -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="${HOME}/local/glfw"
+cmake ../ -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="${HOME}/local/glfw:${VULKAN_SDK}"
 cmake --build . --config Debug -- -j$(nproc) VERBOSE=1
 popd
 
