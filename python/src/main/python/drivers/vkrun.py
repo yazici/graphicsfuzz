@@ -23,6 +23,7 @@ import subprocess
 import time
 import platform
 import json
+import struct
 from typing import Union, IO, Any
 
 ################################################################################
@@ -82,6 +83,13 @@ def spirvas_path():
     if os.path.isfile(spirvas):
         return spirvas
     return 'spirv-as'
+
+
+def spirvdis_path():
+    spirvas = os.path.join(BIN_DIR, 'spirv-dis')
+    if os.path.isfile(spirvas):
+        return spirvas
+    return 'spirv-dis'
 
 
 def remove_end(str_in: str, str_end: str):
@@ -379,7 +387,7 @@ def dump_info_android(wait_for_screen):
     adb_can_fail('shell am force-stop ' + ANDROID_APP)
 
 ################################################################################
-# VkRunner
+# VkRunner / Amber
 
 
 def spv_get_bin_as_uint(shader_filename):
@@ -407,6 +415,11 @@ def spv_get_bin_as_uint(shader_filename):
         result += ' {:x}'.format(word)
 
     return result
+
+
+def spv_get_disassembly(shader_filename):
+    cmd = spirvdis_path() + ' ' + shader_filename
+    return subprocess.check_output(cmd, shell=True).decode('utf-8')
 
 
 def uniform_json_to_vkscript(uniform_json):
@@ -576,40 +589,42 @@ def comp_json_to_vkscript(comp_json):
 
     '''
 
-    offset = 0
-
     with open(comp_json, 'r') as f:
         j = json.load(f)
 
     assert '$compute' in j.keys(), 'Cannot find "$compute" key in JSON file'
     j = j['$compute']
 
-    binding = j['buffer']['binding']
-    data = j['buffer']['input']
+    result = ""
 
-    result = 'ssbo ' + str(binding) + ' subdata int ' + str(offset)
-    for d in data:
-        result += ' ' + str(d)
+    binding = j['buffer']['binding']
+    offset = 0
+    for field_info in j['buffer']['fields']:
+        result += 'ssbo ' + str(binding) + ' subdata ' + field_info['type'] + ' ' + str(offset)
+        for datum in field_info['data']:
+            result += ' ' + str(datum)
+            offset += 4
+        result += '\n'
     result += '\n\n'
 
     result += 'compute'
-    result += ' '  + str(j['num_groups'][0])
-    result += ' '  + str(j['num_groups'][1])
-    result += ' '  + str(j['num_groups'][2])
+    result += ' ' + str(j['num_groups'][0])
+    result += ' ' + str(j['num_groups'][1])
+    result += ' ' + str(j['num_groups'][2])
     result += '\n'
 
     return result
 
 
-def vkscriptify_comp(comp, comp_json):
+def vkscriptify_comp(comp, comp_json, target_amber):
     '''
     Generates a VkScript representation of a compute test
     '''
 
     script = '# Generated\n'
 
-    script += '[compute shader binary]\n'
-    script += spv_get_bin_as_uint(comp)
+    script += '[compute shader ' + ('spirv' if target_amber else 'binary') + ']\n'
+    script += spv_get_disassembly(comp) if target_amber else spv_get_bin_as_uint(comp)
     script += '\n\n'
 
     script += '[test]\n'
@@ -620,6 +635,40 @@ def vkscriptify_comp(comp, comp_json):
     script += '\n'
 
     return script
+
+
+def ssbo_text_to_json(ssbo_text_file, ssbo_json_file, comp_json):
+    '''
+    Read the ssbo_text_file and extract its contents to a json file.
+    '''
+
+    values = open(ssbo_text_file, 'r').read().split()
+    j = json.load(open(comp_json, 'r'))['$compute']
+
+    assert values[0] == str(j['buffer']['binding'])
+
+    byte_pointer = 1
+
+    result = []
+
+    for field_info in j['buffer']['fields']:
+        result_for_field = []
+        for counter in range(0, len(field_info['data'])):
+            hex = ""
+            for byte in range(0, 4):
+                hex += values[byte_pointer]
+                byte_pointer += 1
+            if field_info['type'] == 'int':
+                result_for_field.append(int.from_bytes(bytearray.fromhex(hex), byteorder='little'))
+            elif field_info['type'] == 'float':
+                result_for_field.append(struct.unpack('f', bytearray.fromhex(hex))[0])
+        result.append(result_for_field)
+
+    ssbo_json_obj = { 'ssbo': result }
+
+    with open(ssbo_json_file, 'w') as f:
+        f.write(json.dumps(ssbo_json_obj))
+
 
 def ssbo_bin_to_json(ssbo_bin_file, ssbo_json_file):
     '''
@@ -702,20 +751,25 @@ def run_compute_android(comp, comp_json):
     with open('STATUS', 'w') as f:
         f.write(status)
 
-def run_compute_linux(comp, comp_json):
+def run_compute_linux(comp, comp_json, use_amber):
     assert(os.path.isfile(comp))
     assert(os.path.isfile(comp_json))
 
-    script = vkscriptify_comp(comp, comp_json)
+    script = vkscriptify_comp(comp, comp_json, use_amber)
 
     tmpfile = 'tmpscript.shader_test'
 
     with open(tmpfile, 'w') as f:
         f.write(script)
 
-    # call vkrunner
     ssbo_binding = get_ssbo_binding(comp_json)
-    cmd = 'vkrunner -b ssbo -B ' + str(ssbo_binding) + ' ' + tmpfile + ' > ' + LOGFILE
+
+    if use_amber:
+      # get ready to call amber
+      cmd = 'amber -b ssbo -B ' + str(ssbo_binding) + ' ' + tmpfile + ' > ' + LOGFILE
+    else:
+      # get ready to call vkrunner
+      cmd = 'vkrunner -b ssbo -B ' + str(ssbo_binding) + ' ' + tmpfile + ' > ' + LOGFILE
 
     status = 'SUCCESS'
     try:
@@ -727,7 +781,10 @@ def run_compute_linux(comp, comp_json):
 
     if status == 'SUCCESS':
         assert(os.path.isfile('ssbo'))
-        ssbo_bin_to_json('ssbo', 'ssbo.json')
+        if use_amber:
+            ssbo_text_to_json('ssbo', 'ssbo.json', comp_json)
+        else:
+            ssbo_bin_to_json('ssbo', 'ssbo.json')
 
     with open(LOGFILE, 'a') as f:
         f.write('\nSTATUS ' + status + '\n')
@@ -750,8 +807,10 @@ def main():
     group.add_argument('-l', '--linux', action='store_true', help='Render on Linux')
     group.add_argument('--vkrunner', action='store_true', help='Render using vkrunner')
 
+    parser.add_argument('--amber', action='store_true', help='Render using amber')
+
     parser.add_argument('--compute',
-                       help='Run compute shader using vkrunner. Temp: Values for vert and frag arguments must be provided, but will be ignored, so empty strings are fine for these arguments.')
+                       help='Run compute shader using vkrunner or amber. Temp: Values for vert and frag arguments must be provided, but will be ignored, so empty strings are fine for these arguments.')
 
     parser.add_argument('-s', '--skip-render', action='store_true', help='Skip render')
 
@@ -779,7 +838,7 @@ def main():
         if args.android:
             run_compute_android(comp, args.json)
         elif args.linux:
-            run_compute_linux(comp, args.json)
+            run_compute_linux(comp, args.json, args.amber)
         else:
             print('Either --android or --linux must be set when using --compute')
             exit(1)
