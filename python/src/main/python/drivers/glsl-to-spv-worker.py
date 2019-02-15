@@ -289,7 +289,7 @@ def do_compute_job(args, comp_job):
             return res
 
     if args.linux:
-        vkrun.run_compute_linux(tmpcompspv, tmpjson)
+        vkrun.run_compute_linux(tmpcompspv, tmpjson, args.amber)
     else:
         vkrun.run_compute_android(tmpcompspv, tmpjson)
 
@@ -402,6 +402,11 @@ def main():
         '--vkrunner',
         action='store_true',
         help='Use VkRunner to render on device')
+
+    parser.add_argument(
+        '--amber',
+        action='store_true',
+        help='Use Amber to render on device')
 
     parser.add_argument(
         '--adb-no-serial',

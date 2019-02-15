@@ -660,8 +660,10 @@ def ssbo_text_to_json(ssbo_text_file, ssbo_json_file, comp_json):
                 byte_pointer += 1
             if field_info['type'] == 'int':
                 result_for_field.append(int.from_bytes(bytearray.fromhex(hex), byteorder='little'))
-            elif field_info['type'] == 'float':
+            elif field_info['type'] in ['float', 'vec2', 'vec3', 'vec4']:
                 result_for_field.append(struct.unpack('f', bytearray.fromhex(hex))[0])
+            else:
+                raise Exception('Do not know how to handle type "' + field_info['type'] + '"')
         result.append(result_for_field)
 
     ssbo_json_obj = { 'ssbo': result }
