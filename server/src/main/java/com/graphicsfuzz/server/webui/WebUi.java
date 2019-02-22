@@ -16,10 +16,12 @@
 
 package com.graphicsfuzz.server.webui;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.graphicsfuzz.alphanumcomparator.AlphanumComparator;
 import com.graphicsfuzz.common.util.FileHelper;
+import com.graphicsfuzz.common.util.FuzzyImageComparison;
 import com.graphicsfuzz.common.util.ReductionProgressHelper;
 import com.graphicsfuzz.common.util.ShaderJobFileOperations;
 import com.graphicsfuzz.reducer.ReductionKind;
@@ -181,6 +183,19 @@ public class WebUi extends HttpServlet {
       // If we do not have a stats file, conservatively say that the image is unacceptable.
       return false;
     }
+
+    if (info.has(ShaderJobFileOperations.FUZZY_DIFF_KEY)) {
+      JsonObject fuzzyDiffInfo = info
+          .get(ShaderJobFileOperations.FUZZY_DIFF_KEY)
+          .getAsJsonObject();
+      if (fuzzyDiffInfo.has(FuzzyImageComparison.MainResult.ARE_IMAGES_DIFFERENT_KEY)) {
+        boolean different = fuzzyDiffInfo
+            .get(FuzzyImageComparison.MainResult.ARE_IMAGES_DIFFERENT_KEY)
+            .getAsBoolean();
+        return !different;
+      }
+    }
+    // Otherwise, rely on histogram data.
 
     if (!info.has(metricsKey)) {
       return false;

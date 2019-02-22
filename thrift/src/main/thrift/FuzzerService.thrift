@@ -64,7 +64,7 @@ enum ReductionKind {
 
 enum ImageComparisonMetric {
     HISTOGRAM_CHISQR,
-    PSNR
+    PSNR,
 }
 
 enum WorkerNameError {

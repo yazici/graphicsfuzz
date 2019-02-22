@@ -105,7 +105,14 @@ public class GlslReduce {
                 + "   " + ReductionKind.VALIDATOR_ERROR
                 + "     Reduces while validator gives a particular error\n"
                 + "   " + ReductionKind.ALWAYS_REDUCE
-                + "       Always reduces (useful for testing)\n")
+                + "       Always reduces (useful for testing)\n"
+                + "   " + ReductionKind.FUZZY_DIFFERENT
+                + "     Reduces while produced image and reference image are different according "
+                + "to a fuzzy comparison algorithm\n"
+                + "   " + ReductionKind.FUZZY_SIMILAR
+                + "     Reduces while produced image and reference image are similar according "
+                + "to a fuzzy comparison algorithm\n"
+                + "\n")
           .setDefault("CUSTOM")
           .type(String.class);
 
@@ -419,6 +426,22 @@ public class GlslReduce {
           break;
         case FUZZ:
           fileJudge = new FuzzingFileJudge(corpus, imageGenerator);
+          break;
+        case FUZZY_SIMILAR:
+          fileJudge = new ImageShaderFileJudge(
+              referenceResultFileCopy,
+              imageGenerator,
+              stopOnError,
+              new MetricImageFileComparator(threshold, false, metric, fileOps),
+              fileOps);
+          break;
+        case FUZZY_DIFFERENT:
+          fileJudge = new ImageShaderFileJudge(
+              referenceResultFileCopy,
+              imageGenerator,
+              stopOnError,
+              new MetricImageFileComparator(threshold, true, metric, fileOps),
+              fileOps);
           break;
         default:
           throw new ArgumentParserException(

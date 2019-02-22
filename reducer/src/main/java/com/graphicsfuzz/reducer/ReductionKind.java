@@ -26,4 +26,6 @@ public enum ReductionKind {
   VALIDATOR_ERROR,
   ALWAYS_REDUCE, // Used for testing: always say that a reduction step is interesting
   FUZZ,
+  FUZZY_DIFFERENT,
+  FUZZY_SIMILAR,
 }

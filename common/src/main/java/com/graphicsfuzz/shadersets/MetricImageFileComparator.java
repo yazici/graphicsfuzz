@@ -19,7 +19,7 @@ package com.graphicsfuzz.shadersets;
 import com.graphicsfuzz.common.util.ShaderJobFileOperations;
 import com.graphicsfuzz.server.thrift.ImageComparisonMetric;
 import java.io.File;
-import java.io.FileNotFoundException;
+import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,17 +28,17 @@ public class MetricImageFileComparator implements IImageFileComparator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MetricImageFileComparator.class);
 
   private final double threshold;
-  private final boolean above;
+  private final boolean aboveOrDifferentIsInteresting;
   private final ImageComparisonMetric metric;
   private final ShaderJobFileOperations fileOps;
 
   public MetricImageFileComparator(
       double threshold,
-      boolean above,
+      boolean aboveOrDifferentIsInteresting,
       ImageComparisonMetric metric,
       ShaderJobFileOperations fileOps) {
     this.threshold = threshold;
-    this.above = above;
+    this.aboveOrDifferentIsInteresting = aboveOrDifferentIsInteresting;
     this.metric = metric;
     this.fileOps = fileOps;
   }
@@ -47,14 +47,14 @@ public class MetricImageFileComparator implements IImageFileComparator {
   public boolean areFilesInteresting(File shaderResultFileReference, File shaderResultFileVariant) {
     try {
 
-      return fileOps.areImagesOfShaderResultsSimilar(
+      return fileOps.areImagesOfShaderResultsInteresting(
           shaderResultFileReference,
           shaderResultFileVariant,
           metric,
           threshold,
-          above);
+          aboveOrDifferentIsInteresting);
 
-    } catch (FileNotFoundException exception) {
+    } catch (IOException exception) {
       LOGGER.error(
           "Exception occurred during image comparison using metric {}. {}",
           metric.toString(),
