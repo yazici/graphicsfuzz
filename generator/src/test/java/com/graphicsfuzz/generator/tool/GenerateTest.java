@@ -18,11 +18,13 @@ package com.graphicsfuzz.generator.tool;
 
 import com.graphicsfuzz.common.ast.TranslationUnit;
 import com.graphicsfuzz.common.ast.decl.VariablesDeclaration;
+import com.graphicsfuzz.common.transformreduce.GlslShaderJob;
 import com.graphicsfuzz.common.transformreduce.ShaderJob;
 import com.graphicsfuzz.common.util.GlslParserException;
 import com.graphicsfuzz.common.util.ListConcat;
 import com.graphicsfuzz.common.util.ParseHelper;
 import com.graphicsfuzz.common.util.ParseTimeoutException;
+import com.graphicsfuzz.common.util.PipelineInfo;
 import com.graphicsfuzz.common.util.RandomWrapper;
 import com.graphicsfuzz.common.util.ShaderJobFileOperations;
 import com.graphicsfuzz.common.util.ShaderKind;
@@ -38,6 +40,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import org.apache.commons.io.FileUtils;
 import org.junit.Rule;
@@ -371,6 +374,26 @@ public class GenerateTest {
         .map(item -> item.getName())
         .anyMatch(item -> item.equals("injectionSwitch")));
 
+  }
+
+  @Test
+  public void testStructUniform() throws Exception {
+    // Checks that the generator does not fall over when presented with struct uniforms.
+    final String program = "#version 310 es\n"
+        + "struct S { float x; };"
+        + "uniform S myS;"
+        + "uniform struct T { int y; } myT;"
+        + "void main() {}";
+    final String uniforms = "{}";
+    final File json = temporaryFolder.newFile("shader.json");
+    final File frag = temporaryFolder.newFile("shader.frag");
+    FileUtils.writeStringToFile(frag, program, StandardCharsets.UTF_8);
+    FileUtils.writeStringToFile(json, uniforms, StandardCharsets.UTF_8);
+    final File donors = temporaryFolder.newFolder();
+    final File output = temporaryFolder.newFile("output.json");
+
+    Generate.mainHelper(new String[] { json.getAbsolutePath(), donors.getAbsolutePath(),
+        "310 es", output.getAbsolutePath(), "--seed", "0" });
   }
 
 }
