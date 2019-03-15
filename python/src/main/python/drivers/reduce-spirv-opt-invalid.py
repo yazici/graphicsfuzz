@@ -34,7 +34,7 @@ import shutil
 import stat
 import subprocess
 import sys
-from typing import List
+from typing import IO, List
 
 
 EXPECTED_STRING_RUNNING_OPTIMIZER = 'Running optimizer'
@@ -76,8 +76,35 @@ def get_spirv_opt_flags(error_file: str) -> List[str]:
                 optimizer_command[0:len(optimizer_command)-2].split(', ')[4:]))
 
 
-def write_interestingness_test(output_dir: str, spirvopt_flags: List[str],
-                               validator_error_string: str):
+# Parts of the interestingness test that are common to glsl-reduce and spirv-reduce
+def write_common_parts_of_interestingness_test(interesting: IO[str], spirvopt_flags: List[str],
+                                               validator_error_string:str) -> None:
+    interesting.write('cmd = [ "spirv-opt", unoptimized_spv, "-o", optimized_spv, ' +
+                      ', '.join(list(map(lambda flag: "'" + flag + "'", spirvopt_flags)))
+                      + ']\n')
+    interesting.write('result = subprocess.run(cmd)\n')
+    interesting.write('if result.returncode != 0:\n')
+    interesting.write('  print("Not interesting: spirv-opt failed on the shader.")\n')
+    interesting.write('  sys.exit(1)\n')
+    interesting.write('cmd = [ "spirv-val", optimized_spv ]\n')
+    interesting.write('result = subprocess.run(cmd, stderr=subprocess.PIPE)\n')
+    interesting.write('if result.returncode == 0:\n')
+    interesting.write('  print("Not interesting: spirv-val succeeded.")\n')
+    interesting.write('  sys.exit(1)\n')
+    interesting.write(
+        'abstracted_error_string = re.sub(\'\\d+\', \'_\', '
+        'str(result.stderr, \'utf-8\').split("\\n")[0])\n')
+    interesting.write('if abstracted_error_string != "' + validator_error_string + '":\n')
+    interesting.write(
+        '  print("Not interesting: error output \'" + abstracted_error_string + "\' did not '
+        'match \'' + validator_error_string + '\'")\n')
+    interesting.write('  sys.exit(1)\n')
+    interesting.write('print("Interesting!")\n')
+    interesting.write('sys.exit(0)\n')
+
+
+def write_glsl_reduce_interestingness_test(output_dir: str, spirvopt_flags: List[str],
+                                           validator_error_string: str) -> None:
     interesting_filename = output_dir + os.sep + 'interesting.py'
     with open(interesting_filename, 'w') as interesting:
         interesting.write('#!/usr/bin/python3\n\n')
@@ -94,31 +121,55 @@ def write_interestingness_test(output_dir: str, spirvopt_flags: List[str],
         interesting.write('if result.returncode != 0:\n')
         interesting.write('  print("Not interesting: glslangValidator rejected the shader.")\n')
         interesting.write('  sys.exit(1)\n')
-        interesting.write('cmd = [ "spirv-opt", unoptimized_spv, "-o", optimized_spv, ' +
-                          ', '.join(list(map(lambda flag: "'" + flag + "'", spirvopt_flags)))
-                          + ']\n')
-        interesting.write('result = subprocess.run(cmd)\n')
-        interesting.write('if result.returncode != 0:\n')
-        interesting.write('  print("Not interesting: spirv-opt failed on the shader.")\n')
-        interesting.write('  sys.exit(2)\n')
-        interesting.write('cmd = [ "spirv-val", optimized_spv ]\n')
-        interesting.write('result = subprocess.run(cmd, stderr=subprocess.PIPE)\n')
-        interesting.write('if result.returncode == 0:\n')
-        interesting.write('  print("Not interesting: spirv-val succeeded.")\n')
-        interesting.write('  sys.exit(3)\n')
-        interesting.write(
-            'abstracted_error_string = re.sub(\'\\d+\', \'_\', '
-            'str(result.stderr, \'utf-8\').split("\\n")[0])\n')
-        interesting.write('if abstracted_error_string != "' + validator_error_string + '":\n')
-        interesting.write(
-            '  print("Not interesting: error output \'" + abstracted_error_string + "\' did not '
-            'match \'' + validator_error_string + '\'")\n')
-        interesting.write('  sys.exit(4)\n')
-        interesting.write('print("Interesting!")\n')
-        interesting.write('sys.exit(0)\n')
+        write_common_parts_of_interestingness_test(interesting, spirvopt_flags,
+                                                   validator_error_string)
     # Make the interestingness test executable
     st = os.stat(interesting_filename)
     os.chmod(interesting_filename, st.st_mode | stat.S_IEXEC)
+
+
+def write_spirv_reduce_interestingness_test(output_dir: str, spirvopt_flags: List[str],
+                                            validator_error_string: str) -> None:
+    interesting_filename = output_dir + os.sep + 'interesting.py'
+    with open(interesting_filename, 'w') as interesting:
+        interesting.write('#!/usr/bin/python3\n\n')
+        interesting.write('import os\n')
+        interesting.write('import re\n')
+        interesting.write('import subprocess\n')
+        interesting.write('import sys\n')
+        interesting.write('unoptimized_spv = sys.argv[1]\n')
+        interesting.write('optimized_spv = unoptimized_spv + ".opt.spv"\n')
+        write_common_parts_of_interestingness_test(interesting, spirvopt_flags,
+                                                   validator_error_string)
+    # Make the interestingness test executable
+    st = os.stat(interesting_filename)
+    os.chmod(interesting_filename, st.st_mode | stat.S_IEXEC)
+
+
+def run_glsl_reduce(glsl_reduce_output_dir: str, main_output_dir: str, spirv_opt_flags: str,
+                    validator_error_string: str) -> None:
+    if not os.path.isdir(glsl_reduce_output_dir):
+        os.makedirs(glsl_reduce_output_dir)
+    write_glsl_reduce_interestingness_test(glsl_reduce_output_dir, spirv_opt_flags,
+                                           validator_error_string)
+    # Run glsl-reduce to get the smallest GLSL shader that triggers the problem
+    cmd = ['glsl-reduce', main_output_dir + os.sep + 'shader.json',
+           glsl_reduce_output_dir + os.sep + 'interesting.py', '--output',
+           glsl_reduce_output_dir]
+    subprocess.run(cmd)
+
+
+def run_spirv_reduce(spv_file: str, spirv_reduce_output_dir: str, spirv_opt_flags: str,
+                     validator_error_string: str) -> None:
+    if not os.path.isdir(spirv_reduce_output_dir):
+        os.makedirs(spirv_reduce_output_dir)
+    write_spirv_reduce_interestingness_test(spirv_reduce_output_dir, spirv_opt_flags,
+                                            validator_error_string)
+    # Run glsl-reduce to get the smallest GLSL shader that triggers the problem
+    cmd = ['spirv-reduce', spv_file,
+           spirv_reduce_output_dir + os.sep + 'interesting.py']
+    subprocess.run(cmd)
+
 
 def main_helper(args):
     description = (
@@ -185,12 +236,25 @@ def main_helper(args):
     shutil.copy(original_shader_without_extension + '.json',
                 output_dir + os.sep + 'shader.json')
 
-    write_interestingness_test(output_dir, spirv_opt_flags, validator_error_string)
+    # Run glsl-reduce.
+    glsl_reduce_output_dir = output_dir + os.sep + 'glsl-reduce-output'
+    run_glsl_reduce(glsl_reduce_output_dir,
+                    output_dir,
+                    spirv_opt_flags,
+                    validator_error_string)
 
-    cmd = ['glsl-reduce', output_dir + os.sep + 'shader.json',
-           output_dir + os.sep + 'interesting.py', '--output',
-           output_dir ]
-    subprocess.run(cmd)
+    # Find a minimal set of spirv-opt flags that triggers the problem
+    # Not yet implemented
+    pass
+
+    # Run spirv-reduce.
+    spirv_reduce_output_dir = output_dir + os.sep + 'spirv-reduce-output'
+    run_spirv_reduce(glsl_reduce_output_dir + os.sep + 'shader_reduced_final.spv',
+                     spirv_reduce_output_dir,
+                     spirv_opt_flags,
+                     validator_error_string)
+
+    print('spirv-opt flags causing invalid shader: ' + ' '.join(spirv_opt_flags))
 
 
 if __name__ == '__main__':
